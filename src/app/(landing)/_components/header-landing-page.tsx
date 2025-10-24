@@ -112,7 +112,7 @@ export default function Component() {
 					<ThemeToggleButton
 						variant='rectangle'
 						start='top-down'
-						className='h-9 w-9 p-1'
+						className='h-5 w-5'
 					/>
 				</div>
 			</div>
