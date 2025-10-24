@@ -8,6 +8,7 @@ import {
 	useRef,
 	useState,
 } from 'react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import {
 	Card,
@@ -77,24 +78,29 @@ export default function LoginPage() {
 
 	function handleSignIn(event: FormEvent) {
 		event.preventDefault()
+
+		toast.info('Sign in...')
 		// TODO: Lógica de autenticação aqui
 	}
 	function handleSignInGoogle(event: FormEvent) {
 		event.preventDefault()
+		toast.info('Sign in com Google...')
 		// TODO: Lógica de autenticação aqui
 	}
 
 	function handleSignUp(event: FormEvent) {
 		event.preventDefault()
+		toast.info('Sign up...')
 		// TODO: Lógica de autenticação aqui
 	}
 	function handleSignUpGoogle(event: FormEvent) {
 		event.preventDefault()
+		toast.info('Sign up com Google...')
 		// TODO: Lógica de autenticação aqui
 	}
 
 	return (
-		<div className='flex min-h-screen items-start justify-center bg-linear-to-br from-background via-muted/20 to-background px-4 py-12'>
+		<div className='flex min-h-screen items-start justify-center bg-linear-to-br from-background via-muted/20 to-background px-4 py-5'>
 			<Tabs
 				value={activeTab}
 				onValueChange={handleTabChange}
@@ -212,6 +218,15 @@ export default function LoginPage() {
 									</CardDescription>
 								</CardHeader>
 								<CardContent className='space-y-4'>
+									<div className='space-y-2'>
+										<Label htmlFor='register-name'>Nome</Label>
+										<Input
+											id='register-name'
+											type='text'
+											placeholder='Seu nome completo'
+											required
+										/>
+									</div>
 									<div className='space-y-2'>
 										<Label htmlFor='register-email'>Email</Label>
 										<Input
