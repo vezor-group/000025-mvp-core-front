@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import Logo from '@/components/navbar-components/logo'
+import Logo from '@/components/logo'
 import { ThemeToggleButton } from '@/components/theme-toggle-button'
 import { Button } from '@/components/ui/button'
 import {
