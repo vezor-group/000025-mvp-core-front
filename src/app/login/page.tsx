@@ -73,7 +73,7 @@ export default function LoginPage() {
 	}, [])
 
 	const contentTransitionClass =
-		'transition-all duration-200 data-[state=inactive]:absolute data-[state=inactive]:inset-0 data-[state=inactive]:-z-10 data-[state=inactive]:translate-y-4 data-[state=inactive]:opacity-0 data-[state=inactive]:pointer-events-none data-[state=active]:relative data-[state=active]:translate-y-0 data-[state=active]:opacity-100'
+		'transition-all duration-300 ease-out data-[state=inactive]:absolute data-[state=inactive]:inset-0 data-[state=inactive]:-z-10 data-[state=inactive]:translate-y-6 data-[state=inactive]:opacity-0 data-[state=inactive]:pointer-events-none data-[state=active]:relative data-[state=active]:translate-y-0 data-[state=active]:opacity-100'
 
 	function handleSignIn(event: FormEvent) {
 		event.preventDefault()
@@ -106,7 +106,7 @@ export default function LoginPage() {
 				</TabsList>
 
 				<div
-					className='relative mt-4 w-full overflow-hidden transition-[height] duration-300 ease-out'
+					className='relative mt-4 w-full overflow-hidden transition-[height] duration-400 ease-out'
 					style={{
 						height: contentHeight !== null ? `${contentHeight}px` : undefined,
 					}}
