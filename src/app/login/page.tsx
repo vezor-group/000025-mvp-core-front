@@ -3,7 +3,14 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import {
+	useCallback,
+	useEffect,
+	useLayoutEffect,
+	useMemo,
+	useRef,
+	useState,
+} from 'react'
 import { useForm } from 'react-hook-form'
 import { FaGoogle } from 'react-icons/fa'
 import { toast } from 'sonner'
@@ -32,6 +39,7 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { isAuthenticated, setTokens } from '@/lib/auth'
 
 type TabValue = 'login' | 'register'
 
@@ -98,6 +106,13 @@ export default function LoginPage() {
 		},
 	})
 
+	// Redireciona usuários autenticados para o dashboard
+	useEffect(() => {
+		if (isAuthenticated()) {
+			router.push('/dashboard')
+		}
+	}, [router])
+
 	// Sistema de animação suave para transição entre tabs
 	// Mede dinamicamente a altura do conteúdo para evitar "jumps" visuais
 	const getContentNode = useCallback(
@@ -154,8 +169,8 @@ export default function LoginPage() {
 	// Lógica comum para armazenar tokens e redirecionar após autenticação bem-sucedida
 	const handleAuthSuccess = useCallback(
 		(accessToken: string, refreshToken: string, message: string) => {
-			localStorage.setItem('access_token', accessToken)
-			localStorage.setItem('refresh_token', refreshToken)
+			// Salva tokens no localStorage E cookies (cookies são necessários para o middleware)
+			setTokens(accessToken, refreshToken)
 			toast.success(message)
 			router.push('/dashboard')
 		},
@@ -183,8 +198,8 @@ export default function LoginPage() {
 
 	async function onSignUpSubmit(values: SignUpFormValues) {
 		try {
-			// Remove confirmPassword antes de enviar
-			const { confirmPassword, ...signUpData } = values
+			// Remove confirmPassword antes de enviar (não é necessário no backend)
+			const { confirmPassword: _confirmPassword, ...signUpData } = values
 
 			const response = await authController.signUp(signUpData)
 

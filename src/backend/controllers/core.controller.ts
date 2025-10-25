@@ -7,16 +7,13 @@ export class CoreController {
 
 	protected async fetch(
 		endpoint: string,
-		options?: RequestInit
+		options?: RequestInit,
 	): Promise<Response> {
 		const url = `${this.baseURL}${endpoint}`
 		return fetch(url, options)
 	}
 
-	protected async get<T>(
-		endpoint: string,
-		headers?: HeadersInit
-	): Promise<T> {
+	protected async get<T>(endpoint: string, headers?: HeadersInit): Promise<T> {
 		const response = await this.fetch(endpoint, {
 			method: 'GET',
 			headers,
@@ -30,7 +27,7 @@ export class CoreController {
 	protected async post<T>(
 		endpoint: string,
 		data?: unknown,
-		headers?: HeadersInit
+		headers?: HeadersInit,
 	): Promise<T> {
 		const response = await this.fetch(endpoint, {
 			method: 'POST',
@@ -49,7 +46,7 @@ export class CoreController {
 	protected async put<T>(
 		endpoint: string,
 		data?: unknown,
-		headers?: HeadersInit
+		headers?: HeadersInit,
 	): Promise<T> {
 		const response = await this.fetch(endpoint, {
 			method: 'PUT',
@@ -67,7 +64,7 @@ export class CoreController {
 
 	protected async delete<T>(
 		endpoint: string,
-		headers?: HeadersInit
+		headers?: HeadersInit,
 	): Promise<T> {
 		const response = await this.fetch(endpoint, {
 			method: 'DELETE',

@@ -1,6 +1,20 @@
+'use client'
+
+import { useRouter } from 'next/navigation'
+import { useEffect } from 'react'
 import HeaderLandingPage from '@/app/(landing)/_components/header-landing-page'
+import { isAuthenticated } from '@/lib/auth'
 
 export default function LandingPage() {
+	const router = useRouter()
+
+	// Redireciona usuários autenticados para o dashboard
+	useEffect(() => {
+		if (isAuthenticated()) {
+			router.push('/dashboard')
+		}
+	}, [router])
+
 	return (
 		<>
 			<HeaderLandingPage />

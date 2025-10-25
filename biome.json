@@ -41,7 +41,8 @@
 			"suspicious": {
 				"noUnknownAtRules": "off",
 				"noArrayIndexKey": "off",
-				"noShadowRestrictedNames": "off"
+				"noShadowRestrictedNames": "off",
+				"noDocumentCookie": "off"
 			}
 		},
 		"domains": {
