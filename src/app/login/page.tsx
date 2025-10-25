@@ -1,14 +1,18 @@
 'use client'
 
+import { zodResolver } from '@hookform/resolvers/zod'
 import Link from 'next/link'
-import {
-	type FormEvent,
-	useCallback,
-	useLayoutEffect,
-	useRef,
-	useState,
-} from 'react'
+import { useRouter } from 'next/navigation'
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { FaGoogle } from 'react-icons/fa'
 import { toast } from 'sonner'
+import { z } from 'zod'
+import AuthenticationController from '@/backend/controllers/authentication.controller'
+import {
+	signInRequestSchema,
+	signUpRequestSchema,
+} from '@/backend/types/authentication.type'
 import { Button } from '@/components/ui/button'
 import {
 	Card,
@@ -18,18 +22,84 @@ import {
 	CardHeader,
 	CardTitle,
 } from '@/components/ui/card'
+import {
+	Form,
+	FormControl,
+	FormField,
+	FormItem,
+	FormLabel,
+	FormMessage,
+} from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 type TabValue = 'login' | 'register'
 
+// Schema estendido para incluir confirmação de senha
+const signUpFormSchema = signUpRequestSchema
+	.extend({
+		confirmPassword: z
+			.string()
+			.min(1, 'Confirmação de senha é obrigatória')
+			.min(6, 'Senha deve ter no mínimo 6 caracteres'),
+	})
+	.refine((data) => data.password === data.confirmPassword, {
+		message: 'As senhas não coincidem',
+		path: ['confirmPassword'],
+	})
+
+type SignInFormValues = z.infer<typeof signInRequestSchema>
+type SignUpFormValues = z.infer<typeof signUpFormSchema>
+
+// Componente reutilizável para o botão de autenticação com Google
+function GoogleButton({ onClick }: { onClick: () => void }) {
+	return (
+		<Button
+			variant='outline'
+			type='button'
+			className='w-full'
+			onClick={onClick}
+		>
+			<FaGoogle />
+			Google
+		</Button>
+	)
+}
+
 export default function LoginPage() {
+	const router = useRouter()
 	const [activeTab, setActiveTab] = useState<TabValue>('login')
 	const [contentHeight, setContentHeight] = useState<number | null>(null)
 	const loginContentRef = useRef<HTMLDivElement>(null)
 	const registerContentRef = useRef<HTMLDivElement>(null)
 
+	// Memoiza a instância do controller para evitar recriação em cada render
+	const authController = useMemo(() => new AuthenticationController(), [])
+
+	// Form para login
+	const signInForm = useForm<SignInFormValues>({
+		resolver: zodResolver(signInRequestSchema),
+		defaultValues: {
+			providerAuth: 'basic',
+			email: '',
+			password: '',
+		},
+	})
+
+	// Form para registro
+	const signUpForm = useForm<SignUpFormValues>({
+		resolver: zodResolver(signUpFormSchema),
+		defaultValues: {
+			providerAuth: 'basic',
+			name: '',
+			email: '',
+			password: '',
+			confirmPassword: '',
+		},
+	})
+
+	// Sistema de animação suave para transição entre tabs
+	// Mede dinamicamente a altura do conteúdo para evitar "jumps" visuais
 	const getContentNode = useCallback(
 		(tab: TabValue) =>
 			tab === 'login' ? loginContentRef.current : registerContentRef.current,
@@ -47,9 +117,11 @@ export default function LoginPage() {
 		[getContentNode],
 	)
 
+	// Monitora mudanças na altura do conteúdo (ex: mensagens de erro, validação)
 	useLayoutEffect(() => {
 		measureHeight(activeTab)
 
+		// Fallback para navegadores sem suporte a ResizeObserver
 		if (!('ResizeObserver' in window)) {
 			return
 		}
@@ -73,31 +145,69 @@ export default function LoginPage() {
 		}
 	}, [])
 
+	// Classes para animação de fade + slide entre tabs
+	// Tab inativa: posicionada absolutamente, deslocada para baixo e invisível
+	// Tab ativa: posicionada relativamente, no lugar e visível
 	const contentTransitionClass =
 		'transition-all duration-300 ease-out data-[state=inactive]:absolute data-[state=inactive]:inset-0 data-[state=inactive]:-z-10 data-[state=inactive]:translate-y-6 data-[state=inactive]:opacity-0 data-[state=inactive]:pointer-events-none data-[state=active]:relative data-[state=active]:translate-y-0 data-[state=active]:opacity-100'
 
-	function handleSignIn(event: FormEvent) {
-		event.preventDefault()
+	// Lógica comum para armazenar tokens e redirecionar após autenticação bem-sucedida
+	const handleAuthSuccess = useCallback(
+		(accessToken: string, refreshToken: string, message: string) => {
+			localStorage.setItem('access_token', accessToken)
+			localStorage.setItem('refresh_token', refreshToken)
+			toast.success(message)
+			router.push('/dashboard')
+		},
+		[router],
+	)
 
-		toast.info('Sign in...')
-		// TODO: Lógica de autenticação aqui
-	}
-	function handleSignInGoogle(event: FormEvent) {
-		event.preventDefault()
-		toast.info('Sign in com Google...')
-		// TODO: Lógica de autenticação aqui
+	async function onSignInSubmit(values: SignInFormValues) {
+		try {
+			const response = await authController.signIn(values)
+
+			if (response.data) {
+				handleAuthSuccess(
+					response.data.access_token,
+					response.data.refresh_token,
+					response.message || 'Login realizado com sucesso!',
+				)
+			} else {
+				toast.error(response.message || 'Erro ao fazer login')
+			}
+		} catch (error) {
+			console.error('Erro no login:', error)
+			toast.error('Erro ao fazer login. Verifique suas credenciais.')
+		}
 	}
 
-	function handleSignUp(event: FormEvent) {
-		event.preventDefault()
-		toast.info('Sign up...')
-		// TODO: Lógica de autenticação aqui
+	async function onSignUpSubmit(values: SignUpFormValues) {
+		try {
+			// Remove confirmPassword antes de enviar
+			const { confirmPassword, ...signUpData } = values
+
+			const response = await authController.signUp(signUpData)
+
+			if (response.data) {
+				handleAuthSuccess(
+					response.data.access_token,
+					response.data.refresh_token,
+					response.message || 'Conta criada com sucesso!',
+				)
+			} else {
+				toast.error(response.message || 'Erro ao criar conta')
+			}
+		} catch (error) {
+			console.error('Erro no cadastro:', error)
+			toast.error('Erro ao criar conta. Tente novamente.')
+		}
 	}
-	function handleSignUpGoogle(event: FormEvent) {
-		event.preventDefault()
-		toast.info('Sign up com Google...')
-		// TODO: Lógica de autenticação aqui
-	}
+
+	// Handler unificado para autenticação com Google (usado em ambas as tabs)
+	const handleGoogleAuth = useCallback(() => {
+		toast.info('Autenticação com Google em desenvolvimento...')
+		// TODO: Implementar autenticação OAuth com Google
+	}, [])
 
 	return (
 		<div className='flex min-h-screen items-start justify-center bg-linear-to-br from-background via-muted/20 to-background px-4 py-5'>
@@ -132,72 +242,77 @@ export default function LoginPage() {
 										Entre com suas credenciais para acessar sua conta
 									</CardDescription>
 								</CardHeader>
-								<CardContent className='space-y-4'>
-									<div className='space-y-2'>
-										<Label htmlFor='login-email'>Email</Label>
-										<Input
-											id='login-email'
-											type='email'
-											placeholder='seu@email.com'
-											required
-										/>
-									</div>
-									<div className='space-y-2'>
-										<div className='flex items-center justify-between'>
-											<Label htmlFor='login-password'>Senha</Label>
-											<Link
-												href='#'
-												className='text-sm text-primary hover:underline'
-											>
-												Esqueceu a senha?
-											</Link>
-										</div>
-										<Input
-											id='login-password'
-											type='password'
-											placeholder='••••••••'
-											required
-										/>
-									</div>
-								</CardContent>
-								<CardFooter className='flex flex-col space-y-4'>
-									<Button className='w-full' size='lg' onClick={handleSignIn}>
-										Entrar
-									</Button>
-									<div className='relative'>
-										<div className='absolute inset-0 flex items-center'>
-											<span className='w-full border-t' />
-										</div>
-										<div className='relative flex justify-center text-xs uppercase'>
-											<span className='text-muted-foreground'>
-												Ou continue com
-											</span>
-										</div>
-									</div>
-									<Button
-										variant='outline'
-										type='button'
-										className='w-full'
-										onClick={handleSignInGoogle}
-									>
-										<svg
-											className='mr-2 h-4 w-4'
-											aria-hidden='true'
-											focusable='false'
-											data-prefix='fab'
-											data-icon='google'
-											role='img'
-											xmlns='http://www.w3.org/2000/svg'
-											viewBox='0 0 488 512'
-										>
-											<path
-												fill='currentColor'
-												d='M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 123 24.5 166.3 64.9l-67.5 64.9C258.5 52.6 94.3 116.6 94.3 256c0 86.5 69.1 156.6 153.7 156.6 98.2 0 135-70.4 140.8-106.9H248v-85.3h236.1c2.3 12.7 3.9 24.9 3.9 41.4z'
+								<Form {...signInForm}>
+									<form onSubmit={signInForm.handleSubmit(onSignInSubmit)}>
+										<CardContent className='space-y-4'>
+											<FormField
+												control={signInForm.control}
+												name='email'
+												render={({ field }) => (
+													<FormItem>
+														<FormLabel>Email</FormLabel>
+														<FormControl>
+															<Input
+																type='email'
+																placeholder='seu@email.com'
+																{...field}
+															/>
+														</FormControl>
+														<FormMessage />
+													</FormItem>
+												)}
 											/>
-										</svg>
-										Google
-									</Button>
-								</CardFooter>
+											<FormField
+												control={signInForm.control}
+												name='password'
+												render={({ field }) => (
+													<FormItem>
+														<div className='flex items-center justify-between'>
+															<FormLabel>Senha</FormLabel>
+															<Link
+																href='#'
+																className='text-sm text-primary hover:underline'
+															>
+																Esqueceu a senha?
+															</Link>
+														</div>
+														<FormControl>
+															<Input
+																type='password'
+																placeholder='••••••••'
+																{...field}
+															/>
+														</FormControl>
+														<FormMessage />
+													</FormItem>
+												)}
+											/>
+										</CardContent>
+										<CardFooter className='flex flex-col space-y-4 pt-6'>
+											<Button
+												className='w-full'
+												size='lg'
+												type='submit'
+												disabled={signInForm.formState.isSubmitting}
+											>
+												{signInForm.formState.isSubmitting
+													? 'Entrando...'
+													: 'Entrar'}
+											</Button>
+											<div className='relative'>
+												<div className='absolute inset-0 flex items-center'>
+													<span className='w-full border-t' />
+												</div>
+												<div className='relative flex justify-center text-xs uppercase'>
+													<span className='bg-background px-2 text-muted-foreground'>
+														Ou continue com
+													</span>
+												</div>
+											</div>
+											<GoogleButton onClick={handleGoogleAuth} />
+										</CardFooter>
+									</form>
+								</Form>
 							</Card>
 						</div>
 					</TabsContent>
@@ -217,84 +332,103 @@ export default function LoginPage() {
 										Preencha os dados abaixo para criar sua conta
 									</CardDescription>
 								</CardHeader>
-								<CardContent className='space-y-4'>
-									<div className='space-y-2'>
-										<Label htmlFor='register-name'>Nome</Label>
-										<Input
-											id='register-name'
-											type='text'
-											placeholder='Seu nome completo'
-											required
-										/>
-									</div>
-									<div className='space-y-2'>
-										<Label htmlFor='register-email'>Email</Label>
-										<Input
-											id='register-email'
-											type='email'
-											placeholder='seu@email.com'
-											required
-										/>
-									</div>
-									<div className='space-y-2'>
-										<Label htmlFor='register-password'>Senha</Label>
-										<Input
-											id='register-password'
-											type='password'
-											placeholder='••••••••'
-											required
-										/>
-									</div>
-									<div className='space-y-2'>
-										<Label htmlFor='register-confirm-password'>
-											Confirmar senha
-										</Label>
-										<Input
-											id='register-confirm-password'
-											type='password'
-											placeholder='••••••••'
-											required
-										/>
-									</div>
-								</CardContent>
-								<CardFooter className='flex flex-col space-y-4'>
-									<Button className='w-full' size='lg' onClick={handleSignUp}>
-										Criar conta
-									</Button>
-									<div className='relative'>
-										<div className='absolute inset-0 flex items-center'>
-											<span className='w-full border-t' />
-										</div>
-										<div className='relative flex justify-center text-xs uppercase'>
-											<span className='text-muted-foreground'>
-												Ou continue com
-											</span>
-										</div>
-									</div>
-									<Button
-										variant='outline'
-										type='button'
-										className='w-full'
-										onClick={handleSignUpGoogle}
-									>
-										<svg
-											className='mr-2 h-4 w-4'
-											aria-hidden='true'
-											focusable='false'
-											data-prefix='fab'
-											data-icon='google'
-											role='img'
-											xmlns='http://www.w3.org/2000/svg'
-											viewBox='0 0 488 512'
-										>
-											<path
-												fill='currentColor'
-												d='M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 123 24.5 166.3 64.9l-67.5 64.9C258.5 52.6 94.3 116.6 94.3 256c0 86.5 69.1 156.6 153.7 156.6 98.2 0 135-70.4 140.8-106.9H248v-85.3h236.1c2.3 12.7 3.9 24.9 3.9 41.4z'
+								<Form {...signUpForm}>
+									<form onSubmit={signUpForm.handleSubmit(onSignUpSubmit)}>
+										<CardContent className='space-y-4'>
+											<FormField
+												control={signUpForm.control}
+												name='name'
+												render={({ field }) => (
+													<FormItem>
+														<FormLabel>Nome</FormLabel>
+														<FormControl>
+															<Input
+																type='text'
+																placeholder='Seu nome completo'
+																{...field}
+															/>
+														</FormControl>
+														<FormMessage />
+													</FormItem>
+												)}
 											/>
-										</svg>
-										Google
-									</Button>
-								</CardFooter>
+											<FormField
+												control={signUpForm.control}
+												name='email'
+												render={({ field }) => (
+													<FormItem>
+														<FormLabel>Email</FormLabel>
+														<FormControl>
+															<Input
+																type='email'
+																placeholder='seu@email.com'
+																{...field}
+															/>
+														</FormControl>
+														<FormMessage />
+													</FormItem>
+												)}
+											/>
+											<FormField
+												control={signUpForm.control}
+												name='password'
+												render={({ field }) => (
+													<FormItem>
+														<FormLabel>Senha</FormLabel>
+														<FormControl>
+															<Input
+																type='password'
+																placeholder='••••••••'
+																{...field}
+															/>
+														</FormControl>
+														<FormMessage />
+													</FormItem>
+												)}
+											/>
+											<FormField
+												control={signUpForm.control}
+												name='confirmPassword'
+												render={({ field }) => (
+													<FormItem>
+														<FormLabel>Confirmar senha</FormLabel>
+														<FormControl>
+															<Input
+																type='password'
+																placeholder='••••••••'
+																{...field}
+															/>
+														</FormControl>
+														<FormMessage />
+													</FormItem>
+												)}
+											/>
+										</CardContent>
+										<CardFooter className='flex flex-col space-y-4 pt-6'>
+											<Button
+												className='w-full'
+												size='lg'
+												type='submit'
+												disabled={signUpForm.formState.isSubmitting}
+											>
+												{signUpForm.formState.isSubmitting
+													? 'Criando conta...'
+													: 'Criar conta'}
+											</Button>
+											<div className='relative'>
+												<div className='absolute inset-0 flex items-center'>
+													<span className='w-full border-t' />
+												</div>
+												<div className='relative flex justify-center text-xs uppercase'>
+													<span className='bg-background px-2 text-muted-foreground'>
+														Ou continue com
+													</span>
+												</div>
+											</div>
+											<GoogleButton onClick={handleGoogleAuth} />
+										</CardFooter>
+									</form>
+								</Form>
 							</Card>
 						</div>
 					</TabsContent>
